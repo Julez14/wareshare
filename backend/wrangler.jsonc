@@ -1,0 +1,26 @@
+{
+  "name": "wareshare-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-03-07",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "ENVIRONMENT": "development"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "wareshare-db",
+      "database_id": "693c64fa-f7b2-4d9d-ae5b-2c0ae66d9a42"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "STORAGE",
+      "bucket_name": "wareshare-uploads"
+    }
+  ]
+}
