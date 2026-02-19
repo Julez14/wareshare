@@ -1,169 +1,111 @@
 # Database Schema
 
-## Tables
+## users
 
-### `users`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | TEXT PK | ULID |
-| clerk_id | TEXT UNIQUE | Clerk auth ID |
-| email | TEXT UNIQUE | |
-| full_name | TEXT | |
-| role | TEXT | `renter` `host` `admin` |
-| approval_status | TEXT | `pending` `approved` `rejected` |
-| business_reg_number | TEXT | |
-| website | TEXT | |
-| address | TEXT | |
-| city | TEXT | |
-| province | TEXT | |
-| postal_code | TEXT | |
-| phone | TEXT | |
-| profile_photo_key | TEXT | R2 key |
-| verification_doc_key | TEXT | R2 key |
-| created_at / updated_at | TEXT | ISO 8601 |
+- `id` — ULID primary key
+- `clerk_id` — unique Clerk auth ID
+- `email` — unique
+- `full_name`
+- `role` — `renter` | `host` | `admin`
+- `approval_status` — `pending` | `approved` | `rejected`
+- `business_reg_number`, `website`, `address`, `city`, `province`, `postal_code`, `phone`
+- `profile_photo_key`, `verification_doc_key` — R2 keys
+- `created_at`, `updated_at`
 
----
+## listings
 
-### `listings`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | TEXT PK | ULID |
-| host_id | TEXT FK | → users |
-| title | TEXT | |
-| description | TEXT | |
-| address | TEXT | Hidden from renters in API |
-| city / province / postal_code / country | TEXT | |
-| lat / lng | REAL | |
-| size_sqft | INTEGER | |
-| price_per_month | REAL | |
-| currency | TEXT | Default `CAD` |
-| features | TEXT | JSON array |
-| availability_status | TEXT | `available` `unavailable` `rented` |
-| fulfillment_available | INTEGER | 0 or 1 |
-| fulfillment_description | TEXT | |
-| min_rental_months / max_rental_months | INTEGER | |
-| created_at / updated_at | TEXT | |
+- `id` — ULID primary key
+- `host_id` → users
+- `title`, `description`
+- `address`, `city`, `province`, `postal_code`, `country` — address hidden from renters in API responses
+- `lat`, `lng`
+- `size_sqft`, `price_per_month`, `currency`
+- `features` — JSON array (e.g. `["climate-controlled", "loading-dock"]`)
+- `availability_status` — `available` | `unavailable` | `rented`
+- `fulfillment_available` — boolean (0/1), `fulfillment_description`
+- `min_rental_months`, `max_rental_months`
+- `created_at`, `updated_at`
 
----
+## listing_photos
 
-### `listing_photos`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | TEXT PK | |
-| listing_id | TEXT FK | → listings |
-| r2_key | TEXT | R2 object key |
-| sort_order | INTEGER | |
-| created_at | TEXT | |
+- `id`
+- `listing_id` → listings
+- `r2_key` — R2 object key
+- `sort_order`
+- `created_at`
 
----
+## bookings
 
-### `bookings`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | TEXT PK | ULID |
-| listing_id | TEXT FK | → listings |
-| renter_id | TEXT FK | → users |
-| host_id | TEXT FK | → users |
-| start_date / end_date | TEXT | YYYY-MM-DD |
-| space_requested_sqft | INTEGER | |
-| monthly_rate | REAL | Snapshot of price at booking time |
-| status | TEXT | See lifecycle below |
-| rejected_reason | TEXT | |
-| cancelled_by | TEXT FK | → users |
-| cancelled_at / confirmed_at | TEXT | |
-| created_at / updated_at | TEXT | |
+- `id` — ULID primary key
+- `listing_id` → listings
+- `renter_id`, `host_id` → users
+- `start_date`, `end_date` — YYYY-MM-DD
+- `space_requested_sqft`
+- `monthly_rate` — snapshot of price at time of booking
+- `status` — lifecycle below
+- `rejected_reason`
+- `cancelled_by` → users, `cancelled_at`
+- `confirmed_at`
+- `created_at`, `updated_at`
 
-**Booking status lifecycle:**
-```
-pending_review → agreement_draft → host_edited → renter_accepted → confirmed
-                                 ↘ rejected
-                                 ↘ cancelled
-```
+**Status lifecycle:**
+`pending_review` → `agreement_draft` → `host_edited` → `renter_accepted` → `confirmed`
+At any active stage: → `rejected` or `cancelled`
 
----
+## storage_agreements
 
-### `storage_agreements`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | TEXT PK | |
-| booking_id | TEXT FK UNIQUE | → bookings |
-| content | TEXT | Structured JSON (sections array) |
-| status | TEXT | `draft` `host_edited` `fully_accepted` |
-| host_accepted_at | TEXT | Timestamp of host signature |
-| renter_accepted_at | TEXT | Timestamp of renter signature |
-| created_at / updated_at | TEXT | |
+- `id`
+- `booking_id` → bookings (unique — one agreement per booking)
+- `content` — structured JSON with sections array
+- `status` — `draft` | `host_edited` | `fully_accepted`
+- `host_accepted_at`, `renter_accepted_at` — populated when each party signs; booking confirms when both are set
+- `created_at`, `updated_at`
 
----
+## inventory_items
 
-### `inventory_items`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | TEXT PK | |
-| booking_id | TEXT FK | → bookings |
-| renter_id | TEXT FK | → users |
-| name | TEXT | |
-| type | TEXT | `pallet` `box` `item` |
-| sku | TEXT | |
-| quantity | INTEGER | |
-| category | TEXT | |
-| dimensions | TEXT | |
-| weight_kg | REAL | |
-| notes | TEXT | |
-| created_at / updated_at | TEXT | |
+- `id`
+- `booking_id` → bookings
+- `renter_id` → users
+- `name`
+- `type` — `pallet` | `box` | `item`
+- `sku`, `quantity`, `category`, `dimensions`, `weight_kg`, `notes`
+- `created_at`, `updated_at`
 
----
+## ship_requests
 
-### `ship_requests`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | TEXT PK | |
-| booking_id | TEXT FK | → bookings |
-| renter_id | TEXT FK | → users |
-| carrier_name | TEXT | |
-| tracking_number | TEXT | |
-| expected_arrival_date | TEXT | |
-| description | TEXT | |
-| status | TEXT | `pending` `acknowledged` `received` |
-| acknowledged_at / received_at | TEXT | |
-| notes | TEXT | |
-| created_at / updated_at | TEXT | |
+- `id`
+- `booking_id` → bookings
+- `renter_id` → users
+- `carrier_name`, `tracking_number`, `expected_arrival_date`, `description`
+- `status` — `pending` | `acknowledged` | `received`
+- `acknowledged_at`, `received_at`, `notes`
+- `created_at`, `updated_at`
 
----
+## notifications
 
-### `notifications`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | TEXT PK | |
-| user_id | TEXT FK | → users |
-| type | TEXT | `booking_request` `booking_approved` `booking_rejected` `booking_cancelled` `agreement_ready` `agreement_signed` `message_received` `ship_request_created` `ship_request_updated` `account_approved` `account_rejected` `system` |
-| title | TEXT | |
-| message | TEXT | |
-| related_entity_type | TEXT | e.g. `booking` `ship_request` |
-| related_entity_id | TEXT | |
-| is_read | INTEGER | 0 or 1 |
-| created_at | TEXT | |
+- `id`
+- `user_id` → users
+- `type` — `booking_request` | `booking_approved` | `booking_rejected` | `booking_cancelled` | `agreement_ready` | `agreement_signed` | `message_received` | `ship_request_created` | `ship_request_updated` | `account_approved` | `account_rejected` | `system`
+- `title`, `message`
+- `related_entity_type`, `related_entity_id` — e.g. `booking`, `<booking_id>`
+- `is_read` — 0/1
+- `created_at`
 
----
+## booking_messages
 
-### `booking_messages`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | TEXT PK | |
-| booking_id | TEXT FK | → bookings |
-| sender_id | TEXT FK | → users |
-| content | TEXT | |
-| created_at | TEXT | |
+- `id`
+- `booking_id` → bookings
+- `sender_id` → users
+- `content`
+- `created_at`
 
----
+## calendar_blocks
 
-### `calendar_blocks`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | TEXT PK | |
-| listing_id | TEXT FK | → listings |
-| booking_id | TEXT FK | → bookings (nullable) |
-| start_date / end_date | TEXT | |
-| reason | TEXT | Default `booking` |
-| created_at | TEXT | |
+- `id`
+- `listing_id` → listings
+- `booking_id` → bookings (nullable)
+- `start_date`, `end_date`
+- `reason` — default `booking`
+- `created_at`
 
-> Created automatically when a booking is `confirmed`. Deleted on cancellation.
+> Created automatically when a booking is confirmed. Deleted on cancellation.
