@@ -12,7 +12,9 @@
     "db:seed": "wrangler d1 execute wareshare-db --local --file=./src/db/seed.sql",
     "db:seed:remote": "wrangler d1 execute wareshare-db --remote --file=./src/db/seed.sql",
     "db:reset": "wrangler d1 execute wareshare-db --local --file=./src/db/schema.sql && wrangler d1 execute wareshare-db --local --file=./src/db/seed.sql",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "test": "npx tsx scripts/test-endpoints.ts",
+    "test:remote": "npx tsx scripts/test-endpoints.ts"
   },
   "dependencies": {
     "hono": "^4.7.4",

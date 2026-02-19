@@ -6,7 +6,7 @@ This guide is for frontend developers integrating with the WareShare backend API
 
 ```
 Development: http://localhost:8787/api
-Production: https://wareshare-api.your-subdomain.workers.dev/api
+Production: https://wareshare-api.juelzlax.workers.dev/api
 ```
 
 Set this in your environment as `NEXT_PUBLIC_API_URL`.
