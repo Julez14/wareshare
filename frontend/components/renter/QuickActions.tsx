@@ -6,6 +6,7 @@ import {
   Package,
   Search,
 } from "lucide-react";
+import { routes } from "@/lib/routes";
 
 type ActionCardProps = {
   href: string;
@@ -39,25 +40,25 @@ export default function QuickActions() {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <ActionCard
-        href="/renter/listings"
+        href={routes.renter.listings.root}
         title="Find Warehouses"
         description="Search and compare warehouse listings"
         icon={Search}
       />
       <ActionCard
-        href="/renter/bookings"
+        href={routes.renter.bookings.root}
         title="My Bookings"
         description="View and manage your bookings"
         icon={CalendarCheck}
       />
       <ActionCard
-        href="/renter/inventory"
+        href={routes.renter.inventory.root}
         title="Inventory"
         description="Track items across your bookings"
         icon={Package}
       />
       <ActionCard
-        href="/renter/messages"
+        href={routes.renter.messages.root}
         title="Messages"
         description="Chat with hosts"
         icon={MessageSquare}

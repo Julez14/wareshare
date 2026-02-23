@@ -1,14 +1,13 @@
+import type { Route } from "next";
 import Link from "next/link";
 import {
   Search,
   CalendarCheck,
-  Package,
   MessageSquare,
-  ArrowRight,
-  MapPin,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { routes } from "@/lib/routes";
 import { Booking } from "@/types/booking";
+import { Button } from "@/components/ui/button";
 import EmptyBookingsOverview from "@/components/renter/EmptyBookingsOverview";
 import RecentBookings from "@/components/renter/RecentBookings";
 import QuickActions from "@/components/renter/QuickActions";
@@ -105,7 +104,7 @@ export default function RenterPage() {
           </p>
           <div className="mt-4 sm:mt-6">
             <Button asChild size="lg" className="gap-2">
-              <Link href="/renter/listings">
+              <Link href={routes.renter.listings.root as Route}>
                 <Search className="size-5" aria-hidden />
                 Find warehouse space
               </Link>
@@ -122,13 +121,13 @@ export default function RenterPage() {
             <StatCard
               label="Active bookings"
               value={MOCK_STATS.activeBookings}
-              href="/renter/bookings"
+              href={routes.renter.bookings.root}
               icon={CalendarCheck}
             />
             <StatCard
               label="Unread messages"
               value={MOCK_STATS.unreadMessages}
-              href="/renter/messages"
+              href={routes.renter.messages.root}
               icon={MessageSquare}
             />
           </div>

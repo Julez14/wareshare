@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import { routes } from "@/lib/routes";
 
 export default function LoginForm() {
   const form = useForm<LoginFormValues>({
@@ -77,7 +78,7 @@ export default function LoginForm() {
       <span className="text-muted-foreground block text-center">
         Don't have an account?{" "}
         <Link
-          href="/signup"
+          href={routes.login}
           className="text-primary font-medium underline-offset-2 hover:underline"
         >
           Sign up

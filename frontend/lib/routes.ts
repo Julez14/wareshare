@@ -1,0 +1,21 @@
+export const routes = {
+  renter: {
+    root: "/renter",
+    bookings: {
+      root: "/renter/bookings",
+      details: (bookingId: string) => `/renter/bookings/${bookingId}`,
+    },
+    listings: {
+      root: "/renter/listings",
+    },
+    inventory: {
+      root: "/renter/inventory",
+    },
+    messages: {
+      root: "/renter/messages",
+    },
+    profile: "/renter/profile",
+  },
+  login: "/login",
+  signup: "/signup",
+};

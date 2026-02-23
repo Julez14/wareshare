@@ -1,4 +1,5 @@
 import { formatCurrency, formatDate } from "@/lib/format";
+import { routes } from "@/lib/routes";
 import { Booking } from "@/types/booking";
 import { ArrowRight, MapPin } from "lucide-react";
 import Link from "next/link";
@@ -22,7 +23,7 @@ export default function RecentBookingCard({ booking }: { booking: Booking }) {
 
   return (
     <Link
-      href={`/renter/bookings/${booking.id}`}
+      href={routes.renter.bookings.details(booking.id)}
       className="border-border bg-card hover:border-primary/30 group rounded-lg border p-4"
     >
       <div className="flex flex-col gap-2">

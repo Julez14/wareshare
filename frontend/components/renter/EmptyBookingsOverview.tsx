@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Warehouse } from "lucide-react";
+import { routes } from "@/lib/routes";
 
 export default function EmptyBookingsOverview() {
   return (
@@ -15,7 +16,7 @@ export default function EmptyBookingsOverview() {
         Find warehouse space that fits your needs and start booking
       </p>
       <Button asChild className="mt-6 gap-2">
-        <Link href="/renter/listings">
+        <Link href={routes.renter.listings.root}>
           Find warehouses
           <ArrowRight aria-hidden />
         </Link>
