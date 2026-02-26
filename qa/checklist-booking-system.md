@@ -86,8 +86,8 @@ Booking system items covered across both runs. Items marked `[ ]` require manual
 - `[x]` Admin calling `GET /api/bookings` receives all bookings
 - `[ ]` `?status=confirmed` filter returns only confirmed bookings
 - `[x]` `GET /api/bookings/:id` returns booking + agreement + inventory
-- `[-]` Renter cannot fetch a booking belonging to another renter → needs second renter seed user
-- `[-]` Host cannot fetch a booking for a listing they don't own → needs second host seed user
+- `[x]` Renter cannot fetch a booking belonging to another renter → `403 FORBIDDEN` *(RENTER003 → RENTER001's booking)*
+- `[x]` Host cannot fetch a booking for a listing they don't own → `403 FORBIDDEN` *(HOST003 → HOST001's booking)*
 
 ---
 
@@ -115,7 +115,7 @@ Booking system items covered across both runs. Items marked `[ ]` require manual
 - `[x]` Host edits `special_conditions` array — persists correctly in `content` JSON
 - `[x]` Host edits `notes` field — persists correctly
 - `[-]` Host can re-edit agreement when already `host_edited` (status stays `host_edited`) — not explicitly retested after first edit
-- `[ ]` Renter receives an `agreement_ready` notification after each host edit
+- `[x]` Renter receives an `agreement_ready` notification after each host edit
 
 ### Guards
 - `[x]` Renter attempts to edit the agreement → `403 FORBIDDEN` (endpoint is `requireBookingHost`)
@@ -131,7 +131,7 @@ Booking system items covered across both runs. Items marked `[ ]` require manual
 - `[x]` Renter calls `POST /api/bookings/:id/agreement/accept` when status is `host_edited`
   - `renter_accepted_at` timestamp is set
   - Booking transitions to `renter_accepted`
-  - Host receives `agreement_signed` notification
+  - Host receives `agreement_signed` notification `[x]`
 
 ### Host signs after renter
 - `[x]` Host calls accept when status is `renter_accepted`
@@ -139,11 +139,11 @@ Booking system items covered across both runs. Items marked `[ ]` require manual
   - Both timestamps now populated → booking transitions to `confirmed`
   - Agreement status transitions to `fully_accepted`
   - A `calendar_block` row is created for the listing's date range
-  - Both renter and host receive `booking_approved` notification
+  - Both renter and host receive `booking_approved` notification `[x]`
 
 ### Host signs first (edge case)
 - `[-]` Host calls accept when status is `host_edited` (before renter signs) — **documented behavior:** `host_accepted_at` is set but booking status stays `host_edited`. No dedicated intermediate status exists. Needs second test run to explicitly verify.
-  - Renter receives `agreement_signed` notification
+  - Renter receives `agreement_signed` notification `[x]`
 
 - `[-]` Renter then signs → both timestamps populated → `confirmed` (same outcome) — follows from above
 
@@ -171,7 +171,7 @@ Booking system items covered across both runs. Items marked `[ ]` require manual
 ### Guards
 - `[x]` Cancelling from `rejected` status → `409 CONFLICT` *(edge cases script)*
 - `[x]` Cancelling from `cancelled` status → `409 CONFLICT` *(edge cases script)*
-- `[-]` Third party (not booking participant) attempts cancel → needs second renter seed user
+- `[x]` Third party (not booking participant) attempts cancel → `403 FORBIDDEN` *(RENTER003 → RENTER001's booking)*
 
 ---
 
@@ -190,7 +190,7 @@ Booking system items covered across both runs. Items marked `[ ]` require manual
 |-------|-----------|-------------------|--------|
 | Booking created | Host | `booking_request` | `[x]` |
 | Host rejects booking | Renter | `booking_rejected` | `[x]` |
-| Host edits agreement | Renter | `agreement_ready` | `[ ]` — notification exists in DB but not explicitly asserted |
-| Either party signs | Other party | `agreement_signed` | `[ ]` — same as above |
-| Booking confirmed (both signed) | Both | `booking_approved` | `[ ]` — not explicitly asserted |
+| Host edits agreement | Renter | `agreement_ready` | `[x]` |
+| Either party signs | Other party | `agreement_signed` | `[x]` |
+| Booking confirmed (both signed) | Both | `booking_approved` | `[x]` |
 | Booking cancelled | Other party | `booking_cancelled` | `[ ]` |

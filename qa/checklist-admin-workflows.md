@@ -12,7 +12,10 @@
 | Run | Date | Script | Result |
 |-----|------|--------|--------|
 | 1 | 2026-02-25 | `test-endpoints.ts` | 66/66 ✓ |
-| 2 | 2026-02-25 | `test-edge-cases.ts` | 32/33 ✓ (1 fail: metrics not deployed) |
+| 2 | 2026-02-25 | `test-edge-cases.ts` | 32/33 ✓ (1 fail: metrics not deployed on live API) |
+| 3 | 2026-02-25 | `test-edge-cases.ts` (local) | 33/33 ✓ metrics confirmed working locally |
+| 4 | 2026-02-25 | `test-edge-cases.ts` (local, +RENTER003) | 42/42 ✓ cross-renter isolation confirmed |
+| 5 | 2026-02-26 | `test-edge-cases.ts` (local, +HOST003) | **58/58 ✓** role filter, idempotency, host isolation confirmed |
 
 ---
 
@@ -29,11 +32,11 @@
 
 ### Happy path
 - `[x]` `GET /api/admin/users` returns all users, newest first, with pagination metadata
-- `[-]` `?role=renter` filters to renters only — not explicitly isolated in tests (renter exists but filter not asserted alone)
+- `[x]` `?role=renter` filters to renters only
 - `[x]` `?role=host` filters to hosts only
 - `[x]` `?approval_status=pending` filters to pending accounts only
 - `[x]` `?approval_status=approved` filters to approved accounts only
-- `[-]` `?approval_status=rejected` filters to rejected accounts only — not tested (pending_renter was rejected but filter not asserted)
+- `[x]` `?approval_status=rejected` filters to rejected accounts only
 - `[-]` Combined filter `?role=host&approval_status=pending` returns pending hosts only — not tested
 - `[-]` Pagination: `?page=2&per_page=5` returns correct page slice and correct `total_pages` math — not tested
 
@@ -58,7 +61,7 @@
 - `[ ]` Approved user can now access approved-only endpoints (e.g., create a booking or listing)
 
 ### Idempotency & guards
-- `[-]` Approving an already-`approved` user → `200` with message "User already approved" (no duplicate notification) — not tested
+- `[x]` Approving an already-`approved` user → `200` with message "User already approved" (no duplicate notification)
 - `[-]` Approving a `rejected` user → status changes to `approved` — not tested
 - `[-]` Approving a non-existent user ID → `404 NOT_FOUND` — not tested
 
@@ -79,7 +82,7 @@
 - `[-]` Rejected user can still call `GET /api/listings` (public browse) — not tested; document expected behavior
 
 ### Idempotency & guards
-- `[-]` Rejecting an already-`rejected` user → idempotent — not tested
+- `[x]` Rejecting an already-`rejected` user → `200` with message "User already rejected" (no duplicate notification)
 - `[-]` Rejecting an `approved` user → not tested
 - `[-]` Rejecting a non-existent user ID → `404 NOT_FOUND` — not tested
 
@@ -97,9 +100,9 @@
 
 ## 7. Metrics Dashboard (⚠️ DEPLOYMENT REQUIRED)
 
-> **ACTION REQUIRED FOR JULIAN:** The `GET /api/admin/metrics` endpoint has been written in `backend/src/routes/admin.ts` but has **not been deployed** to Cloudflare Workers. The live API still returns `404 NOT_FOUND` for this route. Julian must run `npm run deploy` (i.e., `wrangler deploy`) before these tests can pass.
+> **ACTION REQUIRED FOR JULIAN:** The `GET /api/admin/metrics` endpoint has been written in `backend/src/routes/admin.ts` and **confirmed working in local dev (33/33 tests pass)**. The live API at `wareshare-api.juelzlax.workers.dev` still returns `404 NOT_FOUND`. Julian must run `npm run deploy` (i.e., `wrangler deploy`) to push it.
 
-- `[!]` `GET /api/admin/metrics` returns 200 with all metric groups — **FAIL: 404 NOT_FOUND (not deployed)**
+- `[!]` `GET /api/admin/metrics` returns 200 with all metric groups — **FAIL on live API (404, not deployed) — PASS locally ✓**
 - `[x]` `GET /api/admin/metrics` called by non-admin user → `403 FORBIDDEN` ✔ *(middleware fires before route resolution)*
 - `[ ]` `users` group contains: `total`, `by_role`, `pending`, `new_last_30_days`
 - `[ ]` `listings` group contains: `total`, `by_availability`

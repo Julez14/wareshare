@@ -53,7 +53,7 @@
 - `[x]` `GET /api/bookings/:bookingId/inventory` returns all items for the booking, ordered newest first
 - `[x]` Renter can fetch their own booking’s inventory
 - `[x]` Host can fetch inventory for their listing’s booking (`requireBookingParticipant` allows both)
-- `[-]` Another renter cannot fetch inventory for a booking they are not part of → `403 FORBIDDEN` — needs second renter seed user
+- `[x]` Another renter cannot fetch inventory for a booking they are not part of → `403 FORBIDDEN` *(RENTER003 → RENTER001's booking)*
 - `[-]` Returns empty `inventory: []` array (not an error) when no items exist — not tested (all test bookings have items)
 
 ---
@@ -63,10 +63,10 @@
 - `[x]` `PUT /api/inventory/:inventoryId` updates allowed fields: `name`, `type`, `sku`, `quantity`, `category`, `dimensions`, `weight_kg`, `notes`
 - `[-]` `updated_at` timestamp is refreshed on update — not explicitly asserted (update returned correct item)
 - `[-]` Attempting to update `booking_id` or `renter_id` via the body has no effect (not in `allowedFields`) — not tested
-- `[-]` Non-owner renter attempts to update another renter’s inventory item → `403 FORBIDDEN` — needs second renter seed user
+- `[x]` Non-owner renter attempts to update another renter’s inventory item → `403 FORBIDDEN` *(RENTER003 → RENTER001's item)*
 - `[-]` Host attempts to update a renter’s inventory item → `403 FORBIDDEN` — not tested
-- `[-]` Body with no valid fields → `400 VALIDATION_ERROR` (`"No valid fields to update"`) — not tested
-- `[-]` Non-existent `inventoryId` → `404 NOT_FOUND` — not tested
+- `[x]` Body with no valid fields → `400 VALIDATION_ERROR` (`"No valid fields to update"`)
+- `[x]` Non-existent `inventoryId` → `404 NOT_FOUND` *(requireInventoryOwner middleware returns 404 before handler runs)*
 
 ---
 
@@ -74,8 +74,8 @@
 
 - `[x]` `DELETE /api/inventory/:inventoryId` by the item’s owner removes the record
 - `[x]` Response is `200` with success message
-- `[-]` Non-owner attempting delete → `403 FORBIDDEN` — needs second renter seed user
-- `[-]` Deleting a non-existent item — **known silent issue:** backend returns 200 with success even if item doesn’t exist (no row check). Flagged to Julian.
+- `[x]` Non-owner attempting delete → `403 FORBIDDEN` *(RENTER003 → RENTER001's item)*
+- `[x]` Deleting a non-existent item → `404 NOT_FOUND` *(requireInventoryOwner middleware — corrected from earlier note: NOT a silent 200)*
 
 ---
 
@@ -90,10 +90,10 @@
 - `[x]` Response is `201` with `ship_request` object
 
 ### Guards
-- `[-]` Host attempts to create a ship request → `403 FORBIDDEN` — not tested
+- `[x]` Host attempts to create a ship request → `403 FORBIDDEN`
 - `[x]` Renter creates ship request on an `agreement_draft` booking → `404 NOT_FOUND`
 - `[-]` Renter creates ship request on a `rejected` booking → `404 NOT_FOUND` — not tested
-- `[-]` Renter creates ship request for a booking that belongs to another renter → `404 NOT_FOUND` — needs second renter
+- `[x]` Renter creates ship request for a booking that belongs to another renter → `404 NOT_FOUND` *(renter_id scoped query — RENTER003 → RENTER001)*
 - `[-]` Unapproved renter → `403 PENDING_APPROVAL` — general auth guard applies
 
 ---
@@ -102,7 +102,7 @@
 
 - `[-]` `GET /api/bookings/:bookingId/ship-requests` returns all ship requests for a booking, newest first — renter side not isolated
 - `[x]` Host can fetch for a booking on their listing
-- `[-]` Third-party renter cannot fetch → `403 FORBIDDEN` — needs second renter
+- `[x]` Third-party renter cannot fetch → `403 FORBIDDEN` *(RENTER003 → RENTER001's booking)*
 - `[-]` Returns empty `ship_requests: []` when none exist — not tested
 
 ---
@@ -131,7 +131,9 @@
 |-------|-----------|-------------------|--------|
 | Ship request created | Host | `ship_request_created` | `[x]` main script |
 | Ship request status updated | Renter | `ship_request_updated` | `[x]` main script |
-
+| Host edits agreement | Renter | `agreement_ready` | `[x]` event asserted in Notification Event Assertions suite |
+| Either party signs | Other party | `agreement_signed` | `[x]` event asserted in Notification Event Assertions suite |
+| Booking confirmed | Both parties | `booking_approved` | `[x]` event asserted in Notification Event Assertions suite |
 ---
 
 ## 9. Notifications — General Endpoint Tests

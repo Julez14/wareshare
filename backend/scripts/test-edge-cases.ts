@@ -17,13 +17,18 @@
  * • Cancel from already-cancelled → 409
  * • Inventory add to rejected booking → 404
  * • Notifications: mark specific IDs as read
+ * • Cross-renter isolation: RENTER003 cannot access RENTER001 resources
+ *   (third-party booking/inventory/ship-request 403s)
  */
 
-const BASE_URL = "https://wareshare-api.juelzlax.workers.dev";
+const BASE_URL =
+  process.env.TEST_BASE_URL ?? "https://wareshare-api.juelzlax.workers.dev";
 
 const ADMIN_TOKEN = "Bearer test-admin_test";
 const HOST_TOKEN  = "Bearer test-host_test";
+const HOST2_TOKEN = "Bearer test-host2_test"; // HOST003 — second approved host
 const RENTER_TOKEN = "Bearer test-renter_test";
+const RENTER2_TOKEN = "Bearer test-renter2_test"; // RENTER003 — second approved renter
 const PENDING_RENTER_TOKEN = "Bearer test-pending_renter_test";
 
 interface TestResult { name: string; passed: boolean; error?: string }
@@ -80,6 +85,7 @@ async function req(method: string, path: string, opts: { token?: string; body?: 
 let edgeBookingId = "";
 let edgeCancelledBookingId = "";
 let firstNotificationId = "";
+let renter1InventoryId = ""; // used by cross-renter isolation suite
 
 // ─────────────────────────────────────────────────────────────────────────────
 suite("Booking Guards");
@@ -468,6 +474,255 @@ await test("POST /api/notifications/read — no payload → 400", async () => {
     body: {},
   });
   assertStatus(status, 400);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+suite("Cross-Renter Isolation");
+// guardBookingId is RENTER001's confirmed booking (from Agreement State Guards suite)
+// RENTER003 (renter2_test) must not be able to access any of its resources.
+
+await test("RENTER003 cannot GET RENTER001's booking → 403", async () => {
+  const { status } = await req("GET", `/api/bookings/${guardBookingId}`, {
+    token: RENTER2_TOKEN,
+  });
+  assertStatus(status, 403);
+});
+
+await test("RENTER003 cannot cancel RENTER001's booking → 403", async () => {
+  const { status } = await req("POST", `/api/bookings/${guardBookingId}/cancel`, {
+    token: RENTER2_TOKEN,
+  });
+  assertStatus(status, 403);
+});
+
+await test("Setup: RENTER001 adds inventory item to their confirmed booking", async () => {
+  const { status, body } = await req("POST", `/api/bookings/${guardBookingId}/inventory`, {
+    token: RENTER_TOKEN,
+    body: { name: "Ownership Test Box", type: "item", quantity: 2 },
+  });
+  assertStatus(status, 201, body);
+  renter1InventoryId = ((body as Record<string, unknown>).item as Record<string, unknown>).id as string;
+  assert(renter1InventoryId.length > 0, "inventory id captured");
+});
+
+await test("RENTER003 cannot GET RENTER001's inventory → 403", async () => {
+  const { status } = await req("GET", `/api/bookings/${guardBookingId}/inventory`, {
+    token: RENTER2_TOKEN,
+  });
+  assertStatus(status, 403);
+});
+
+await test("RENTER003 cannot add inventory to RENTER001's booking → 403", async () => {
+  const { status } = await req("POST", `/api/bookings/${guardBookingId}/inventory`, {
+    token: RENTER2_TOKEN,
+    body: { name: "Unauthorized Item", type: "item" },
+  });
+  assertStatus(status, 403);
+});
+
+await test("RENTER003 cannot update RENTER001's inventory item → 403", async () => {
+  const { status } = await req("PUT", `/api/inventory/${renter1InventoryId}`, {
+    token: RENTER2_TOKEN,
+    body: { name: "Hacked Name" },
+  });
+  assertStatus(status, 403);
+});
+
+await test("RENTER003 cannot delete RENTER001's inventory item → 403", async () => {
+  const { status } = await req("DELETE", `/api/inventory/${renter1InventoryId}`, {
+    token: RENTER2_TOKEN,
+  });
+  assertStatus(status, 403);
+});
+
+await test("RENTER003 cannot create ship request on RENTER001's booking → 404 (renter_id scoped)", async () => {
+  // Backend query for ship request creation filters: booking.renter_id = user.id
+  // So RENTER003 just gets NOT_FOUND, not FORBIDDEN
+  const { status } = await req("POST", `/api/bookings/${guardBookingId}/ship-requests`, {
+    token: RENTER2_TOKEN,
+    body: { description: "Unauthorized ship" },
+  });
+  assertStatus(status, 404);
+});
+
+await test("RENTER003 cannot GET RENTER001's ship requests → 403", async () => {
+  const { status } = await req("GET", `/api/bookings/${guardBookingId}/ship-requests`, {
+    token: RENTER2_TOKEN,
+  });
+  assertStatus(status, 403);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+suite("Admin — Role Filter & Status Filter");
+
+await test("GET /api/admin/users?role=renter — all results have role=renter", async () => {
+  const { status, body } = await req("GET", "/api/admin/users?role=renter", {
+    token: ADMIN_TOKEN,
+  });
+  assertStatus(status, 200, body);
+  const users = (body as Record<string, unknown>).users as Record<string, unknown>[];
+  assert(users.length > 0, "at least one renter exists");
+  assert(users.every((u) => u.role === "renter"), "all results have role=renter");
+});
+
+await test("Setup: reject RENTER002 to populate rejected state", async () => {
+  const { status, body } = await req("POST", "/api/admin/users/RENTER002/reject", {
+    token: ADMIN_TOKEN,
+    body: { reason: "Failed verification" },
+  });
+  assertStatus(status, 200, body);
+  const user = (body as Record<string, unknown>).user as Record<string, unknown>;
+  assert(user.approval_status === "rejected", "RENTER002 is now rejected");
+});
+
+await test("GET /api/admin/users?approval_status=rejected — all results are rejected", async () => {
+  const { status, body } = await req("GET", "/api/admin/users?approval_status=rejected", {
+    token: ADMIN_TOKEN,
+  });
+  assertStatus(status, 200, body);
+  const users = (body as Record<string, unknown>).users as Record<string, unknown>[];
+  assert(users.length > 0, "at least one rejected user exists");
+  assert(
+    users.every((u) => u.approval_status === "rejected"),
+    "all results have approval_status=rejected"
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+suite("Admin — Idempotency");
+
+await test("Approve HOST001 (already approved) → 200 with idempotent message", async () => {
+  const { status, body } = await req("POST", "/api/admin/users/HOST001/approve", {
+    token: ADMIN_TOKEN,
+  });
+  assertStatus(status, 200, body);
+  const b = body as Record<string, unknown>;
+  assert(
+    (b.message as string).toLowerCase().includes("already approved"),
+    `expected 'already approved' in message, got: ${b.message}`
+  );
+});
+
+await test("Reject RENTER002 again (already rejected) → 200 with idempotent message", async () => {
+  // RENTER002 was rejected in the previous suite setup step
+  const { status, body } = await req("POST", "/api/admin/users/RENTER002/reject", {
+    token: ADMIN_TOKEN,
+    body: { reason: "Trying again" },
+  });
+  assertStatus(status, 200, body);
+  const b = body as Record<string, unknown>;
+  assert(
+    (b.message as string).toLowerCase().includes("already rejected"),
+    `expected 'already rejected' in message, got: ${b.message}`
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+suite("Ship Request — Host Cannot Create");
+
+await test("Host attempts to create ship request on their own booking → 403", async () => {
+  // guardBookingId is HOST001's confirmed booking — hosts cannot create ship requests
+  const { status, body } = await req("POST", `/api/bookings/${guardBookingId}/ship-requests`, {
+    token: HOST_TOKEN,
+    body: { carrier_name: "FedEx", description: "Host trying to ship" },
+  });
+  assertStatus(status, 403, body);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+suite("Inventory — Remaining Guards");
+// renter1InventoryId was created in the Cross-Renter Isolation suite
+
+await test("PUT /api/inventory/:id with empty body → 400 (no valid fields)", async () => {
+  const { status, body } = await req("PUT", `/api/inventory/${renter1InventoryId}`, {
+    token: RENTER_TOKEN,
+    body: {},
+  });
+  assertStatus(status, 400, body);
+  assertCode(body, "VALIDATION_ERROR");
+});
+
+await test("PUT /api/inventory/nonexistent → 404 NOT_FOUND", async () => {
+  const { status, body } = await req("PUT", "/api/inventory/INVENTORY_DOES_NOT_EXIST", {
+    token: RENTER_TOKEN,
+    body: { name: "Ghost" },
+  });
+  assertStatus(status, 404, body);
+  assertCode(body, "NOT_FOUND");
+});
+
+await test("DELETE /api/inventory/nonexistent → 404 NOT_FOUND", async () => {
+  const { status, body } = await req("DELETE", "/api/inventory/INVENTORY_DOES_NOT_EXIST", {
+    token: RENTER_TOKEN,
+  });
+  assertStatus(status, 404, body);
+  assertCode(body, "NOT_FOUND");
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+suite("Notification — Event Assertions");
+// guardBookingId went through the full agreement state machine:
+//   host edited → agreement_ready (→ renter)
+//   renter signed → agreement_signed (→ host)
+//   host signed → booking_approved (→ both)
+
+await test("Renter received agreement_ready notification after host edited", async () => {
+  const { status, body } = await req("GET", "/api/notifications", { token: RENTER_TOKEN });
+  assertStatus(status, 200, body);
+  const notifs = (body as Record<string, unknown>).notifications as Record<string, unknown>[];
+  const found = notifs.find((n) => n.type === "agreement_ready");
+  assert(found !== undefined, "agreement_ready notification found for renter");
+});
+
+await test("Host received agreement_signed notification after renter signed", async () => {
+  const { status, body } = await req("GET", "/api/notifications", { token: HOST_TOKEN });
+  assertStatus(status, 200, body);
+  const notifs = (body as Record<string, unknown>).notifications as Record<string, unknown>[];
+  const found = notifs.find((n) => n.type === "agreement_signed");
+  assert(found !== undefined, "agreement_signed notification found for host");
+});
+
+await test("Renter received booking_approved notification after full confirmation", async () => {
+  const { status, body } = await req("GET", "/api/notifications", { token: RENTER_TOKEN });
+  assertStatus(status, 200, body);
+  const notifs = (body as Record<string, unknown>).notifications as Record<string, unknown>[];
+  const found = notifs.find((n) => n.type === "booking_approved");
+  assert(found !== undefined, "booking_approved notification found for renter");
+});
+
+await test("Host received booking_approved notification after full confirmation", async () => {
+  const { status, body } = await req("GET", "/api/notifications", { token: HOST_TOKEN });
+  assertStatus(status, 200, body);
+  const notifs = (body as Record<string, unknown>).notifications as Record<string, unknown>[];
+  const found = notifs.find((n) => n.type === "booking_approved");
+  assert(found !== undefined, "booking_approved notification found for host");
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+suite("Cross-Host Isolation");
+// HOST003 (host2_test) has no listings/bookings — must be blocked from HOST001's resources
+
+await test("HOST003 cannot GET a booking they are not party to → 403", async () => {
+  const { status } = await req("GET", `/api/bookings/${guardBookingId}`, {
+    token: HOST2_TOKEN,
+  });
+  assertStatus(status, 403);
+});
+
+await test("HOST003 cannot reject HOST001's booking → 403", async () => {
+  const { status } = await req("POST", `/api/bookings/${guardBookingId}/reject`, {
+    token: HOST2_TOKEN,
+    body: { reason: "Unauthorized reject" },
+  });
+  assertStatus(status, 403);
+});
+
+await test("HOST003 cannot edit HOST001's storage agreement → 403", async () => {
+  const { status } = await req("PUT", `/api/bookings/${guardBookingId}/agreement`, {
+    token: HOST2_TOKEN,
+    body: { notes: "Unauthorized edit" },
+  });
+  assertStatus(status, 403);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
