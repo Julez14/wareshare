@@ -13,6 +13,10 @@
 |-----|------|--------|--------|
 | 1 | 2026-02-25 | `test-endpoints.ts` | 66/66 ✓ |
 | 2 | 2026-02-25 | `test-edge-cases.ts` | 32/33 ✓ (1 fail: metrics not deployed) |
+| 3 | 2026-02-25 | `test-edge-cases.ts` (local) | 33/33 ✓ metrics confirmed working locally |
+| 4 | 2026-02-25 | `test-edge-cases.ts` (local, +RENTER003) | 42/42 ✓ cross-renter isolation confirmed |
+| 5 | 2026-02-26 | `test-edge-cases.ts` (local, +HOST003) | **58/58 ✓** role filter, idempotency, host isolation confirmed |
+| 6 | 2026-02-26 | `test-edge-cases.ts` (local, full) | **72/72 ✓** inventory defaults, ship request edge cases, admin reversed transitions |
 
 Booking system items covered across both runs. Items marked `[ ]` require manual testing once the frontend is built. Items marked `[-]` need seed data setup or are noted architectural decisions.
 

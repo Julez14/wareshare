@@ -20,6 +20,10 @@
 |-----|------|--------|--------|
 | 1 | 2026-02-25 | `test-endpoints.ts` | 66/66 ✓ |
 | 2 | 2026-02-25 | `test-edge-cases.ts` | 32/33 ✓ (1 fail: metrics not deployed) |
+| 3 | 2026-02-25 | `test-edge-cases.ts` (local) | 33/33 ✓ metrics confirmed working locally |
+| 4 | 2026-02-25 | `test-edge-cases.ts` (local, +RENTER003) | 42/42 ✓ cross-renter isolation confirmed |
+| 5 | 2026-02-26 | `test-edge-cases.ts` (local, +HOST003) | **58/58 ✓** role filter, idempotency, host isolation confirmed |
+| 6 | 2026-02-26 | `test-edge-cases.ts` (local, full) | **72/72 ✓** inventory defaults, ship request edge cases, admin reversed transitions |
 
 ---
 
@@ -28,18 +32,18 @@
 ### Happy path (via booking creation)
 - `[x]` Submitting `inventory` array in `POST /api/bookings` creates all items linked to the booking
 - `[x]` Each item has correct `booking_id` and `renter_id`
-- `[-]` Items with only `name` (all other fields optional) are created successfully — not isolated; all test items include name
-- `[-]` `type` defaults to `item` if not provided — not explicitly asserted
-- `[-]` `quantity` defaults to `1` if not provided — not explicitly asserted
+- `[x]` Items with only `name` (all other fields optional) are created successfully *(run 6: `"Bare Minimum Box"` → 201)*
+- `[x]` `type` defaults to `item` if not provided *(run 6: explicitly asserted)*
+- `[x]` `quantity` defaults to `1` if not provided *(run 6: explicitly asserted)*
 
 ### Happy path (standalone add)
 - `[x]` `POST /api/bookings/:bookingId/inventory` by the booking’s renter adds an item
-- `[-]` Adding an item to a booking with status `agreement_draft` works — main script adds to a confirmed booking
-- `[-]` Adding an item to a `confirmed` booking works (inventory can be added post-confirmation — verify this is intended) — **main script does this, it succeeded; behavior confirmed as allowed**
+- `[x]` Adding an item to a booking with status `agreement_draft` works *(run 6: dedicated draft booking test → 201)*
+- `[x]` Adding an item to a `confirmed` booking works (inventory can be added post-confirmation — **intentional, confirmed allowed**) *(main script + run 6)*
 - `[x]` Response is `201` with the new `item` object
 
 ### Guards
-- `[-]` Renter adds inventory to a booking that is not theirs → `403 FORBIDDEN` — needs second renter seed user
+- `[x]` Renter adds inventory to a booking that is not theirs → `403 FORBIDDEN` *(run 4: RENTER003 → RENTER001's booking)*
 - `[x]` Host attempts to add inventory to a booking → `403 FORBIDDEN`
 - `[x]` Adding inventory to a `rejected` booking → `404 NOT_FOUND`
 - `[x]` Adding inventory to a `cancelled` booking → `404 NOT_FOUND`
@@ -54,17 +58,17 @@
 - `[x]` Renter can fetch their own booking’s inventory
 - `[x]` Host can fetch inventory for their listing’s booking (`requireBookingParticipant` allows both)
 - `[x]` Another renter cannot fetch inventory for a booking they are not part of → `403 FORBIDDEN` *(RENTER003 → RENTER001's booking)*
-- `[-]` Returns empty `inventory: []` array (not an error) when no items exist — not tested (all test bookings have items)
+- `[x]` Returns empty `inventory: []` array (not an error) when no items exist *(run 6: fresh booking with no inventory → `[]`)*
 
 ---
 
 ## 3. Inventory — Update
 
 - `[x]` `PUT /api/inventory/:inventoryId` updates allowed fields: `name`, `type`, `sku`, `quantity`, `category`, `dimensions`, `weight_kg`, `notes`
-- `[-]` `updated_at` timestamp is refreshed on update — not explicitly asserted (update returned correct item)
-- `[-]` Attempting to update `booking_id` or `renter_id` via the body has no effect (not in `allowedFields`) — not tested
-- `[x]` Non-owner renter attempts to update another renter’s inventory item → `403 FORBIDDEN` *(RENTER003 → RENTER001's item)*
-- `[-]` Host attempts to update a renter’s inventory item → `403 FORBIDDEN` — not tested
+- `[x]` `updated_at` timestamp is refreshed on update *(run 6: 1s wait + before/after assert)*
+- `[-]` Attempting to update `booking_id` or `renter_id` via the body has no effect (not in `allowedFields`) — low-risk; `allowedFields` array in inventory.ts excludes these fields by design
+- `[x]` Non-owner renter attempts to update another renter's inventory item → `403 FORBIDDEN` *(RENTER003 → RENTER001's item)*
+- `[x]` Host attempts to update a renter's inventory item → `403 FORBIDDEN` *(run 6: HOST_TOKEN → renter1InventoryId)*
 - `[x]` Body with no valid fields → `400 VALIDATION_ERROR` (`"No valid fields to update"`)
 - `[x]` Non-existent `inventoryId` → `404 NOT_FOUND` *(requireInventoryOwner middleware returns 404 before handler runs)*
 
@@ -85,14 +89,14 @@
 - `[x]` Approved renter creates ship request on a `confirmed` booking
 - `[-]` Approved renter creates ship request on a `renter_accepted` booking (allowed per backend check) — not tested in isolation
 - `[x]` Request created with status `pending`
-- `[-]` Host receives `ship_request_created` notification — not explicitly asserted (notification endpoint confirmed functional)
-- `[-]` All optional fields (`carrier_name`, `tracking_number`, `expected_arrival_date`, `description`) default to `null` when not provided — not asserted
+- `[x]` Host receives `ship_request_created` notification *(run 6: asserted from HOST_TOKEN /api/notifications)*
+- `[x]` All optional fields (`carrier_name`, `tracking_number`, `expected_arrival_date`) default to `null` when not provided *(run 6: explicitly asserted)*
 - `[x]` Response is `201` with `ship_request` object
 
 ### Guards
 - `[x]` Host attempts to create a ship request → `403 FORBIDDEN`
 - `[x]` Renter creates ship request on an `agreement_draft` booking → `404 NOT_FOUND`
-- `[-]` Renter creates ship request on a `rejected` booking → `404 NOT_FOUND` — not tested
+- `[x]` Renter creates ship request on a `rejected` booking → `404 NOT_FOUND` *(run 6: edgeBookingId was rejected → 404)*
 - `[x]` Renter creates ship request for a booking that belongs to another renter → `404 NOT_FOUND` *(renter_id scoped query — RENTER003 → RENTER001)*
 - `[-]` Unapproved renter → `403 PENDING_APPROVAL` — general auth guard applies
 
@@ -100,7 +104,7 @@
 
 ## 6. Ship Requests — Read
 
-- `[-]` `GET /api/bookings/:bookingId/ship-requests` returns all ship requests for a booking, newest first — renter side not isolated
+- `[x]` `GET /api/bookings/:bookingId/ship-requests` returns all ship requests for a booking — renter GET confirmed *(run 6: RENTER_TOKEN on guardBookingId → array with items)*
 - `[x]` Host can fetch for a booking on their listing
 - `[x]` Third-party renter cannot fetch → `403 FORBIDDEN` *(RENTER003 → RENTER001's booking)*
 - `[-]` Returns empty `ship_requests: []` when none exist — not tested
@@ -113,11 +117,11 @@
 - `[x]` Host updates status `pending` → `acknowledged`: `acknowledged_at` timestamp is set
 - `[x]` Host updates status `acknowledged` → `received`: `received_at` timestamp is set
 - `[x]` Host adds `notes` along with a status update — persisted correctly
-- `[-]` Renter receives a `ship_request_updated` notification for each status change — not explicitly asserted
+- `[x]` Renter receives a `ship_request_updated` notification after status change *(run 6: explicitly asserted from RENTER_TOKEN after host set received)*
 
 ### Edge cases & guards
 - `[x]` Renter attempts status update → `403 FORBIDDEN`
-- `[-]` Host skips `acknowledged` and directly sets `received` — **documented behavior:** no sequential enforcement exists in backend. Allowed. Note for Julian/April: add enforcement if sequential flow is a product requirement.
+- `[x]` Host skips `acknowledged` and directly sets `received` → **confirmed allowed** *(run 6: host sets `received` on `pending` SR; `acknowledged_at` remains null, `received_at` is set)* — Note for Julian/April: add sequential enforcement if product requires it
 - `[-]` Host attempts to set status back to `pending` from `acknowledged` — not tested; document whether rollback is allowed
 - `[x]` Invalid status value (e.g., `"shipped"`) → `400 VALIDATION_ERROR`
 - `[-]` Non-existent `requestId` → `404 NOT_FOUND` — not tested

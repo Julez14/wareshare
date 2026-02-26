@@ -16,6 +16,7 @@
 | 3 | 2026-02-25 | `test-edge-cases.ts` (local) | 33/33 ✓ metrics confirmed working locally |
 | 4 | 2026-02-25 | `test-edge-cases.ts` (local, +RENTER003) | 42/42 ✓ cross-renter isolation confirmed |
 | 5 | 2026-02-26 | `test-edge-cases.ts` (local, +HOST003) | **58/58 ✓** role filter, idempotency, host isolation confirmed |
+| 6 | 2026-02-26 | `test-edge-cases.ts` (local, full) | **72/72 ✓** reversed state transitions confirmed |
 
 ---
 
@@ -62,7 +63,7 @@
 
 ### Idempotency & guards
 - `[x]` Approving an already-`approved` user → `200` with message "User already approved" (no duplicate notification)
-- `[-]` Approving a `rejected` user → status changes to `approved` — not tested
+- `[x]` Approving a `rejected` user → status changes to `approved` *(run 6: RENTER002 was rejected, then re-approved → approval_status=approved)*
 - `[-]` Approving a non-existent user ID → `404 NOT_FOUND` — not tested
 
 ---
@@ -83,7 +84,7 @@
 
 ### Idempotency & guards
 - `[x]` Rejecting an already-`rejected` user → `200` with message "User already rejected" (no duplicate notification)
-- `[-]` Rejecting an `approved` user → not tested
+- `[x]` Rejecting an `approved` user → status changes to `rejected` *(run 6: HOST003 was approved, then rejected → approval_status=rejected)*
 - `[-]` Rejecting a non-existent user ID → `404 NOT_FOUND` — not tested
 
 ---

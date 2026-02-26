@@ -19,6 +19,14 @@
  * • Notifications: mark specific IDs as read
  * • Cross-renter isolation: RENTER003 cannot access RENTER001 resources
  *   (third-party booking/inventory/ship-request 403s)
+ * • Admin role & approval_status filters
+ * • Admin idempotency (approve already-approved, reject already-rejected)
+ * • Admin reversed state (approve rejected user, reject approved user)
+ * • Ship request: host cannot create, rejected booking guard
+ * • Ship request remaining: optional fields, renter GET, notification assertion,
+ *   skip-acknowledged direct-to-received
+ * • Inventory: defaults (type/quantity), draft booking, host update/delete blocked
+ * • Cross-host isolation: HOST003 cannot access HOST001 resources
  */
 
 const BASE_URL =
@@ -86,6 +94,7 @@ let edgeBookingId = "";
 let edgeCancelledBookingId = "";
 let firstNotificationId = "";
 let renter1InventoryId = ""; // used by cross-renter isolation suite
+let remainingShipRequestId = ""; // used by ship request remaining suite
 
 // ─────────────────────────────────────────────────────────────────────────────
 suite("Booking Guards");
@@ -723,6 +732,205 @@ await test("HOST003 cannot edit HOST001's storage agreement → 403", async () =
     body: { notes: "Unauthorized edit" },
   });
   assertStatus(status, 403);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+suite("Inventory — Defaults & Remaining Edge Cases");
+// renter1InventoryId is RENTER001's item on guardBookingId (confirmed)
+
+await test("Item created with only name — type defaults to 'item', quantity defaults to 1", async () => {
+  const { status, body } = await req("POST", `/api/bookings/${guardBookingId}/inventory`, {
+    token: RENTER_TOKEN,
+    body: { name: "Bare Minimum Box" },
+  });
+  assertStatus(status, 201, body);
+  const item = (body as Record<string, unknown>).item as Record<string, unknown>;
+  assert(item.type === "item", `expected type='item', got '${item.type}'`);
+  assert(item.quantity === 1, `expected quantity=1, got ${item.quantity}`);
+});
+
+await test("Add inventory to agreement_draft booking → 201", async () => {
+  // Create a fresh booking that is in agreement_draft (not advanced)
+  const { status: bStatus, body: bBody } = await req("POST", "/api/bookings", {
+    token: RENTER_TOKEN,
+    body: { listing_id: "LISTING001", start_date: "2028-01-01", end_date: "2028-03-31" },
+  });
+  assertStatus(bStatus, 201, bBody);
+  const draftBookingId = ((bBody as Record<string, unknown>).booking as Record<string, unknown>).id as string;
+  assert((bBody as Record<string, unknown>).booking !== null, "draft booking created");
+
+  const { status, body } = await req("POST", `/api/bookings/${draftBookingId}/inventory`, {
+    token: RENTER_TOKEN,
+    body: { name: "Draft Stage Item", type: "pallet", quantity: 5 },
+  });
+  assertStatus(status, 201, body);
+  const item = (body as Record<string, unknown>).item as Record<string, unknown>;
+  assert(item.name === "Draft Stage Item", "item name correct");
+
+  // Verify GET returns empty list on a booking that has only 1 item — also proves non-empty case
+  const { status: gStatus, body: gBody } = await req("GET", `/api/bookings/${draftBookingId}/inventory`, {
+    token: RENTER_TOKEN,
+  });
+  assertStatus(gStatus, 200, gBody);
+  const items = (gBody as Record<string, unknown>).inventory as unknown[];
+  assert(Array.isArray(items), "inventory is array");
+  assert(items.length === 1, `expected 1 item, got ${items.length}`);
+});
+
+await test("GET inventory on booking with no items → empty array (not error)", async () => {
+  // Create a booking but add no inventory
+  const { body: bBody } = await req("POST", "/api/bookings", {
+    token: RENTER_TOKEN,
+    body: { listing_id: "LISTING001", start_date: "2028-04-01", end_date: "2028-06-30" },
+  });
+  const emptyBookingId = ((bBody as Record<string, unknown>).booking as Record<string, unknown>).id as string;
+
+  const { status, body } = await req("GET", `/api/bookings/${emptyBookingId}/inventory`, {
+    token: RENTER_TOKEN,
+  });
+  assertStatus(status, 200, body);
+  const items = (body as Record<string, unknown>).inventory as unknown[];
+  assert(Array.isArray(items) && items.length === 0, `expected empty array, got ${JSON.stringify(items)}`);
+});
+
+await test("Host cannot update renter's inventory item → 403", async () => {
+  const { status } = await req("PUT", `/api/inventory/${renter1InventoryId}`, {
+    token: HOST_TOKEN,
+    body: { name: "Host Overwrite Attempt" },
+  });
+  assertStatus(status, 403);
+});
+
+await test("Host cannot delete renter's inventory item → 403", async () => {
+  const { status } = await req("DELETE", `/api/inventory/${renter1InventoryId}`, {
+    token: HOST_TOKEN,
+  });
+  assertStatus(status, 403);
+});
+
+await test("updated_at is refreshed on inventory update", async () => {
+  // Fetch current state
+  const { body: before } = await req("GET", `/api/bookings/${guardBookingId}/inventory`, {
+    token: RENTER_TOKEN,
+  });
+  const items = (before as Record<string, unknown>).inventory as Record<string, unknown>[];
+  const target = items.find((i) => i.id === renter1InventoryId);
+  assert(target !== undefined, "target item found");
+  const updatedAtBefore = target!.updated_at as string;
+
+  // Wait 1s to ensure timestamp differs
+  await new Promise((r) => setTimeout(r, 1000));
+
+  const { status, body: after } = await req("PUT", `/api/inventory/${renter1InventoryId}`, {
+    token: RENTER_TOKEN,
+    body: { notes: "timestamp refresh test" },
+  });
+  assertStatus(status, 200, after);
+  const updatedItem = (after as Record<string, unknown>).item as Record<string, unknown>;
+  assert(
+    updatedItem.updated_at !== updatedAtBefore,
+    `updated_at should have changed (before=${updatedAtBefore}, after=${updatedItem.updated_at})`
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+suite("Ship Request — Remaining Edge Cases");
+
+await test("Ship request on rejected booking → 404", async () => {
+  // edgeBookingId was rejected by the host in the Booking Rejection suite
+  const { status } = await req("POST", `/api/bookings/${edgeBookingId}/ship-requests`, {
+    token: RENTER_TOKEN,
+    body: { description: "Should not work on rejected booking" },
+  });
+  assertStatus(status, 404);
+});
+
+await test("Optional ship request fields default to null when not provided", async () => {
+  const { status, body } = await req("POST", `/api/bookings/${guardBookingId}/ship-requests`, {
+    token: RENTER_TOKEN,
+    body: { description: "Minimal ship request" },
+  });
+  assertStatus(status, 201, body);
+  const sr = (body as Record<string, unknown>).ship_request as Record<string, unknown>;
+  assert(sr.carrier_name === null, `carrier_name should be null, got ${sr.carrier_name}`);
+  assert(sr.tracking_number === null, `tracking_number should be null, got ${sr.tracking_number}`);
+  assert(sr.expected_arrival_date === null, `expected_arrival_date should be null, got ${sr.expected_arrival_date}`);
+  remainingShipRequestId = sr.id as string;
+  assert(remainingShipRequestId.length > 0, "ship request id captured");
+});
+
+await test("Renter can GET their own ship requests", async () => {
+  const { status, body } = await req("GET", `/api/bookings/${guardBookingId}/ship-requests`, {
+    token: RENTER_TOKEN,
+  });
+  assertStatus(status, 200, body);
+  const requests = (body as Record<string, unknown>).ship_requests as unknown[];
+  assert(Array.isArray(requests), "ship_requests is array");
+  assert(requests.length > 0, "at least one ship request returned");
+});
+
+await test("Host receives ship_request_created notification", async () => {
+  const { status, body } = await req("GET", "/api/notifications?unread_only=false", {
+    token: HOST_TOKEN,
+  });
+  assertStatus(status, 200, body);
+  const notifs = (body as Record<string, unknown>).notifications as Record<string, unknown>[];
+  const found = notifs.find((n) => n.type === "ship_request_created");
+  assert(found !== undefined, "ship_request_created notification found for host");
+});
+
+await test("Host can skip acknowledged and set status directly to received", async () => {
+  // Backend has no sequential enforcement — this should succeed
+  const { status, body } = await req("PUT", `/api/ship-requests/${remainingShipRequestId}/status`, {
+    token: HOST_TOKEN,
+    body: { status: "received", notes: "Skipped acknowledged intentionally" },
+  });
+  assertStatus(status, 200, body);
+  const sr = (body as Record<string, unknown>).ship_request as Record<string, unknown>;
+  assert(sr.status === "received", `expected received, got ${sr.status}`);
+  assert(sr.acknowledged_at === null, `acknowledged_at should still be null (skipped), got ${sr.acknowledged_at}`);
+  assert(typeof sr.received_at === "string", "received_at timestamp set");
+});
+
+await test("Renter receives ship_request_updated notification", async () => {
+  const { status, body } = await req("GET", "/api/notifications", {
+    token: RENTER_TOKEN,
+  });
+  assertStatus(status, 200, body);
+  const notifs = (body as Record<string, unknown>).notifications as Record<string, unknown>[];
+  const found = notifs.find((n) => n.type === "ship_request_updated");
+  assert(found !== undefined, "ship_request_updated notification found for renter");
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+suite("Admin — Reversed State Transitions");
+// Tests that approval changes can be reversed (no one-way lock)
+
+await test("Approve a rejected user (RENTER002) → approval_status becomes approved", async () => {
+  // RENTER002 was rejected in the Admin Role Filter suite
+  const { status, body } = await req("POST", "/api/admin/users/RENTER002/approve", {
+    token: ADMIN_TOKEN,
+  });
+  assertStatus(status, 200, body);
+  const user = (body as Record<string, unknown>).user as Record<string, unknown>;
+  assert(
+    user.approval_status === "approved",
+    `expected approved, got ${user.approval_status}`
+  );
+});
+
+await test("Reject an approved user (HOST003) → approval_status becomes rejected", async () => {
+  // HOST003 is seeded as approved and has no live bookings
+  const { status, body } = await req("POST", "/api/admin/users/HOST003/reject", {
+    token: ADMIN_TOKEN,
+    body: { reason: "Testing reversed state transition" },
+  });
+  assertStatus(status, 200, body);
+  const user = (body as Record<string, unknown>).user as Record<string, unknown>;
+  assert(
+    user.approval_status === "rejected",
+    `expected rejected, got ${user.approval_status}`
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
