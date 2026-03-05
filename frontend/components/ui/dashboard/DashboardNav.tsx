@@ -1,9 +1,10 @@
 "use client";
 
-import { LucideIcon, Menu, X } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { routes } from "@/lib/routes";
+import { LucideIcon, Menu, X } from "lucide-react";
 
 import { useState } from "react";
 
@@ -36,7 +37,7 @@ export default function DashboardNav({
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
         {/* LOGO */}
         <Link
-          href="/renter"
+          href={routes.renter.root}
           className="text-foreground flex shrink-0 items-center gap-2 font-semibold hover:opacity-90"
         >
           <Image
