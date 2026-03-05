@@ -14,7 +14,8 @@
  *   LISTING001, LISTING002 created by HOST001
  */
 
-const BASE_URL = "https://wareshare-api.juelzlax.workers.dev";
+const BASE_URL =
+  process.env.TEST_BASE_URL ?? "https://wareshare-api.juelzlax.workers.dev";
 
 // Auth tokens
 const ADMIN_TOKEN = "Bearer test-admin_test";
