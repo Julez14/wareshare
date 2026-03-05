@@ -34,6 +34,15 @@ type MetricsData = {
     average_booking_value_cad: number;
   };
   top_cities: Array<{ city: string; province: string; listing_count: number }>;
+  demand: {
+    avg_rental_duration_days: number | null;
+    avg_space_requested_sqft: number | null;
+    bookings_by_service_type: { fulfillment: number; storage_only: number };
+  };
+  vacancy: {
+    avg_days_until_first_booking: number | null;
+    listings_never_booked: number;
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -306,6 +315,100 @@ export default function MetricsDashboardPage() {
           ) : null}
         </section>
       </div>
+
+      <Separator />
+
+      <Separator />
+
+      {/* Demand Profile */}
+      <section>
+        <SectionHeading>Demand Profile</SectionHeading>
+        {loading ? (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : data ? (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <StatCard
+                label="Avg Rental Duration"
+                value={data.demand.avg_rental_duration_days !== null ? `${data.demand.avg_rental_duration_days} days` : "—"}
+                variant="muted"
+              />
+              <StatCard
+                label="Avg Space Requested"
+                value={data.demand.avg_space_requested_sqft !== null ? `${data.demand.avg_space_requested_sqft.toLocaleString()} sqft` : "—"}
+                variant="muted"
+              />
+              <StatCard
+                label="Fulfillment Bookings"
+                value={data.demand.bookings_by_service_type.fulfillment}
+                variant="muted"
+              />
+              <StatCard
+                label="Storage-Only Bookings"
+                value={data.demand.bookings_by_service_type.storage_only}
+                variant="muted"
+              />
+            </div>
+            {(() => {
+              const totalServiceBookings =
+                data.demand.bookings_by_service_type.fulfillment +
+                data.demand.bookings_by_service_type.storage_only;
+              return (
+                <div className="bg-card space-y-3 rounded-lg border p-5">
+                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                    Service Type Breakdown
+                  </p>
+                  <ProgressBarRow
+                    label="Fulfillment"
+                    value={data.demand.bookings_by_service_type.fulfillment}
+                    total={totalServiceBookings}
+                    color="bg-violet-500"
+                  />
+                  <ProgressBarRow
+                    label="Storage Only"
+                    value={data.demand.bookings_by_service_type.storage_only}
+                    total={totalServiceBookings}
+                    color="bg-sky-400"
+                  />
+                </div>
+              );
+            })()}
+          </div>
+        ) : null}
+      </section>
+
+      <Separator />
+
+      {/* Listing Vacancy */}
+      <section>
+        <SectionHeading>Listing Vacancy</SectionHeading>
+        {loading ? (
+          <div className="grid grid-cols-2 gap-4">
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        ) : data ? (
+          <>
+            <div className="grid grid-cols-2 gap-4">
+              <StatCard
+                label="Avg Days Until First Booking"
+                value={data.vacancy.avg_days_until_first_booking !== null ? `${data.vacancy.avg_days_until_first_booking} days` : "—"}
+                variant="muted"
+              />
+              <StatCard
+                label="Listings Never Booked"
+                value={data.vacancy.listings_never_booked}
+                variant={data.vacancy.listings_never_booked > 0 ? "warning" : "default"}
+              />
+            </div>
+            <p className="text-muted-foreground mt-3 text-xs">
+              * Vacancy counted from listing creation to first confirmed booking.
+            </p>
+          </>
+        ) : null}
+      </section>
 
       <Separator />
 

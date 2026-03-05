@@ -10,7 +10,7 @@
 
 ## Purpose
 
-Give the WareShare team (April + admin) a live view of platform health, user growth, and booking activity at a glance. No manual counting, no spreadsheets.
+Give the WareShare team (admin) a live view of platform health, user growth, and booking activity at a glance. No manual counting, no spreadsheets.
 
 ---
 
@@ -55,6 +55,24 @@ Give the WareShare team (April + admin) a live view of platform health, user gro
 |-----|--------|
 | Top 5 cities by listing count | `GROUP BY city ORDER BY count DESC LIMIT 5` |
 
+### 6. Demand Profile 
+| KPI | Source |
+|-----|--------|
+| Average rental duration (days) | `AVG(julianday(end_date) - julianday(start_date))` on `confirmed` bookings |
+| Average space requested (sqft) | `AVG(space_requested_sqft)` across all bookings |
+| Bookings requiring fulfillment | `COUNT WHERE l.fulfillment_available = 1` via JOIN |
+| Bookings storage-only | `COUNT WHERE l.fulfillment_available = 0` via JOIN |
+
+*Note: Search-query logging (e.g. how many times a filter was applied) requires a `search_logs` table not yet in the schema.*
+
+### 7. Listing Vacancy 
+| KPI | Source |
+|-----|--------|
+| Average days until first confirmed booking | Per listing: `MIN(b.confirmed_at) - l.created_at`, averaged over listings with ≥1 confirmed booking |
+| Listings never booked | `COUNT listings WHERE NOT EXISTS (confirmed booking)` |
+
+*These two metrics help admin understand demand lag — how quickly new listings attract renters, and how many spaces are sitting idle.*
+
 ---
 
 ## API Response Shape — `GET /api/admin/metrics`
@@ -92,7 +110,19 @@ Give the WareShare team (April + admin) a live view of platform health, user gro
   "top_cities": [
     { "city": "Vancouver", "province": "BC", "listing_count": 5 },
     { "city": "Burnaby", "province": "BC", "listing_count": 3 }
-  ]
+  ],
+  "demand": {
+    "avg_rental_duration_days": 92,
+    "avg_space_requested_sqft": 1400,
+    "bookings_by_service_type": {
+      "fulfillment": 18,
+      "storage_only": 32
+    }
+  },
+  "vacancy": {
+    "avg_days_until_first_booking": 14,
+    "listings_never_booked": 4
+  }
 }
 ```
 
@@ -143,3 +173,6 @@ Give the WareShare team (April + admin) a live view of platform health, user gro
 - `[ ]` Error state shown if API call fails (e.g. "Could not load metrics. Try refreshing.")
 - `[ ]` A "Refresh" button re-fetches the data without full page reload
 - `[ ]` Revenue section includes a disclaimer: "Simulated values based on agreed rates. No payments processed."
+- `[ ]` **Demand Profile section** rendered with: avg rental duration (days), avg space requested (sqft), fulfillment vs storage-only `ProgressBarRow`
+- `[ ]` **Listing Vacancy section** rendered with: avg days until first booking, listings-never-booked count; includes note "Vacancy counted from listing creation to first confirmed booking."
+- `[ ]` All new stat values are numeric (non-null); zero is rendered as `0` not blank

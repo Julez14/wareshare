@@ -97,6 +97,16 @@ let renter1InventoryId = ""; // used by cross-renter isolation suite
 let remainingShipRequestId = ""; // used by ship request remaining suite
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Global setup: ensure RENTER002 is rejected before any suite runs.
+// The "Reversed State Transitions" suite approves RENTER002 at the end of a
+// run, so without a reset the Booking Guards suite would see them as approved.
+// This call is idempotent: if already rejected it returns 200 "already rejected".
+await req("POST", "/api/admin/users/RENTER002/reject", {
+  token: ADMIN_TOKEN,
+  body: { reason: "Test run setup: ensuring non-approved state" },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 suite("Booking Guards");
 
 await test("Rejected renter cannot create booking (403 REJECTED_ACCOUNT)", async () => {
@@ -443,6 +453,26 @@ await test("GET /api/admin/metrics — returns all metric groups", async () => {
   const bookings = b.bookings as Record<string, unknown>;
   assert(typeof bookings.confirmation_rate === "number", "confirmation_rate is number");
   assert(typeof bookings.in_progress === "number", "in_progress is number");
+  const demand = b.demand as Record<string, unknown>;
+  assert(typeof demand === "object" && demand !== null, "demand group present");
+  assert(
+    demand.avg_rental_duration_days === null || typeof demand.avg_rental_duration_days === "number",
+    "avg_rental_duration_days is number or null"
+  );
+  assert(
+    demand.avg_space_requested_sqft === null || typeof demand.avg_space_requested_sqft === "number",
+    "avg_space_requested_sqft is number or null"
+  );
+  const svcType = demand.bookings_by_service_type as Record<string, unknown>;
+  assert(typeof svcType.fulfillment === "number", "fulfillment count is number");
+  assert(typeof svcType.storage_only === "number", "storage_only count is number");
+  const vacancy = b.vacancy as Record<string, unknown>;
+  assert(typeof vacancy === "object" && vacancy !== null, "vacancy group present");
+  assert(
+    vacancy.avg_days_until_first_booking === null || typeof vacancy.avg_days_until_first_booking === "number",
+    "avg_days_until_first_booking is number or null"
+  );
+  assert(typeof vacancy.listings_never_booked === "number", "listings_never_booked is number");
 });
 
 await test("GET /api/admin/metrics — non-admin gets 403", async () => {

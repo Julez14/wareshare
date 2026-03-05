@@ -210,6 +210,53 @@ admin.get('/metrics', async (c) => {
      LIMIT 5`
   ).all<{ city: string; province: string; listing_count: number }>();
 
+  // Demand profile
+  const avgRentalDuration = await c.env.DB.prepare(
+    `SELECT ROUND(AVG(julianday(end_date) - julianday(start_date))) as avg_days
+     FROM bookings WHERE status = 'confirmed'`
+  ).first<{ avg_days: number | null }>();
+
+  const avgSpaceRequested = await c.env.DB.prepare(
+    `SELECT ROUND(AVG(space_requested_sqft)) as avg_sqft
+     FROM bookings WHERE space_requested_sqft IS NOT NULL`
+  ).first<{ avg_sqft: number | null }>();
+
+  const bookingsByServiceType = await c.env.DB.prepare(
+    `SELECT l.fulfillment_available, COUNT(*) as count
+     FROM bookings b
+     JOIN listings l ON b.listing_id = l.id
+     GROUP BY l.fulfillment_available`
+  ).all<{ fulfillment_available: number; count: number }>();
+
+  const serviceTypeMap = bookingsByServiceType.results.reduce((acc, { fulfillment_available, count }) => {
+    if (fulfillment_available === 1) acc.fulfillment = count;
+    else acc.storage_only = count;
+    return acc;
+  }, { fulfillment: 0, storage_only: 0 } as { fulfillment: number; storage_only: number });
+
+  // Vacancy
+  const avgDaysUntilFirstBooking = await c.env.DB.prepare(
+    `SELECT ROUND(AVG(
+       julianday(first_confirmed.min_confirmed_at) - julianday(l.created_at)
+     )) as avg_days
+     FROM listings l
+     JOIN (
+       SELECT listing_id, MIN(confirmed_at) as min_confirmed_at
+       FROM bookings
+       WHERE status = 'confirmed' AND confirmed_at IS NOT NULL
+       GROUP BY listing_id
+     ) first_confirmed ON l.id = first_confirmed.listing_id`
+  ).first<{ avg_days: number | null }>();
+
+  const listingsNeverBooked = await c.env.DB.prepare(
+    `SELECT COUNT(*) as count
+     FROM listings l
+     WHERE NOT EXISTS (
+       SELECT 1 FROM bookings b
+       WHERE b.listing_id = l.id AND b.status = 'confirmed'
+     )`
+  ).first<{ count: number }>();
+
   return c.json({
     users: {
       total: totalUsers?.count || 0,
@@ -239,6 +286,15 @@ admin.get('/metrics', async (c) => {
       average_booking_value_cad: Math.round(revenueResult?.average || 0),
     },
     top_cities: topCities.results,
+    demand: {
+      avg_rental_duration_days: avgRentalDuration?.avg_days ?? null,
+      avg_space_requested_sqft: avgSpaceRequested?.avg_sqft ?? null,
+      bookings_by_service_type: serviceTypeMap,
+    },
+    vacancy: {
+      avg_days_until_first_booking: avgDaysUntilFirstBooking?.avg_days ?? null,
+      listings_never_booked: listingsNeverBooked?.count ?? 0,
+    },
   });
 });
 
