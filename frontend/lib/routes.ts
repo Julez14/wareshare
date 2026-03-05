@@ -7,6 +7,7 @@ export const routes = {
     },
     listings: {
       root: "/renter/listings",
+      details: (listingId: string) => `/renter/listings/${listingId}`,
     },
     inventory: {
       root: "/renter/inventory",

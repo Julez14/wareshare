@@ -1,10 +1,6 @@
 import type { Route } from "next";
 import Link from "next/link";
-import {
-  Search,
-  CalendarCheck,
-  MessageSquare,
-} from "lucide-react";
+import { Search, CalendarCheck, MessageSquare } from "lucide-react";
 import { routes } from "@/lib/routes";
 import { Booking } from "@/types/booking";
 import { Button } from "@/components/ui/button";
