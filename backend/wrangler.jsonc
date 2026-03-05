@@ -14,7 +14,8 @@
     {
       "binding": "DB",
       "database_name": "wareshare-db",
-      "database_id": "693c64fa-f7b2-4d9d-ae5b-2c0ae66d9a42"
+      "database_id": "693c64fa-f7b2-4d9d-ae5b-2c0ae66d9a42",
+      "migrations_dir": "migrations"
     }
   ],
   "r2_buckets": [
