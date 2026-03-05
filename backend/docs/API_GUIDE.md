@@ -453,6 +453,20 @@ Sign the storage agreement. **Requires: booking participant (host or renter).**
 - If renter signs first → status stays `host_edited` (waiting for host)
 - When both sign → status becomes `confirmed`, calendar block created
 
+#### GET /api/bookings/:id/agreement/pdf
+Generate and download a formatted storage agreement PDF. **Requires: booking participant.**
+
+What this endpoint does:
+1. Reads the latest agreement JSON from `storage_agreements.content`
+2. Renders a styled PDF (including host/renter info and full warehouse address)
+3. Stores the generated file in the existing R2 `STORAGE` bucket under `pdf/agreements/`
+4. Returns the PDF as a downloadable response
+
+**Response headers:**
+- `Content-Type: application/pdf`
+- `Content-Disposition: attachment; filename="wareshare-agreement-<bookingId>.pdf"`
+- `X-R2-Key: pdf/agreements/<bookingId>-<agreementUpdatedAt>.pdf`
+
 #### POST /api/bookings/:id/cancel
 Cancel a booking. **Requires: booking participant.**
 
@@ -689,5 +703,6 @@ When the host edits, they can modify `sections`, `special_conditions`, and `note
 | `POST /api/bookings/:id/reject` | Yes | Yes | host | Reject booking |
 | `PUT /api/bookings/:id/agreement` | Yes | Yes | host | Edit agreement |
 | `POST /api/bookings/:id/agreement/accept` | Yes | Yes | participant | Sign agreement |
+| `GET /api/bookings/:id/agreement/pdf` | Yes | Yes | participant | Download agreement PDF |
 | `POST /api/admin/users/:id/approve` | Yes | Yes | admin | Approve user |
 | `POST /api/uploads/presigned-url` | Yes | Yes | varies | Get upload URL |

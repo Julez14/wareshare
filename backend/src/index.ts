@@ -8,6 +8,7 @@ import bookings from './routes/bookings';
 import inventory from './routes/inventory';
 import { notifications, messages } from './routes/notifications';
 import uploads from './routes/uploads';
+import pdfs from './routes/pdfs';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -15,7 +16,7 @@ app.use('*', cors({
   origin: '*',
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
-  exposeHeaders: ['Content-Length'],
+  exposeHeaders: ['Content-Length', 'Content-Disposition', 'X-R2-Key'],
   maxAge: 600,
   credentials: true,
 }));
@@ -33,6 +34,7 @@ app.get('/', (c) => {
       notifications: '/api/notifications',
       messages: '/api/messages',
       uploads: '/api/uploads',
+      pdfs: '/api/bookings/:id/agreement/pdf',
     },
   });
 });
@@ -49,6 +51,7 @@ app.route('/api', inventory);
 app.route('/api/notifications', notifications);
 app.route('/api', messages);
 app.route('/api/uploads', uploads);
+app.route('/api', pdfs);
 
 app.notFound((c) => {
   return c.json({ error: 'Not found', code: 'NOT_FOUND' }, 404);

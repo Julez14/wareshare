@@ -14,7 +14,8 @@
  *   LISTING001, LISTING002 created by HOST001
  */
 
-const BASE_URL = "https://wareshare-api.juelzlax.workers.dev";
+const BASE_URL = process.env.BASE_URL || "https://wareshare-api.juelzlax.workers.dev";
+const RUN_PDF_TEST = process.env.TEST_PDF_ENDPOINT === "1";
 
 // Auth tokens
 const ADMIN_TOKEN = "Bearer test-admin_test";
@@ -96,6 +97,25 @@ async function req(
   }
 
   return { status: res.status, body };
+}
+
+async function reqRaw(
+  method: string,
+  path: string,
+  options: { token?: string; body?: unknown } = {}
+): Promise<{ status: number; headers: Headers; bytes: Uint8Array }> {
+  const headers: Record<string, string> = {};
+  if (options.token) headers["Authorization"] = options.token;
+  if (options.body !== undefined) headers["Content-Type"] = "application/json";
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers,
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+  });
+
+  const buffer = await res.arrayBuffer();
+  return { status: res.status, headers: res.headers, bytes: new Uint8Array(buffer) };
 }
 
 // ─── Test State (IDs created during test run) ────────────────────────────────
@@ -562,6 +582,26 @@ await test("POST /api/bookings/:id/agreement/accept — host accepts agreement (
   const agreement = b.agreement as Record<string, unknown>;
   assert(agreement.status === "fully_accepted", "agreement fully_accepted");
 });
+
+if (RUN_PDF_TEST) {
+  await test("GET /api/bookings/:id/agreement/pdf — participant downloads formatted PDF", async () => {
+    const { status, headers, bytes } = await reqRaw(
+      "GET",
+      `/api/bookings/${createdBookingId}/agreement/pdf`,
+      { token: RENTER_TOKEN }
+    );
+    assertStatus(status, 200);
+    const contentType = headers.get("content-type") || "";
+    assert(contentType.includes("application/pdf"), `unexpected content-type ${contentType}`);
+    const disposition = headers.get("content-disposition") || "";
+    assert(disposition.includes("attachment;"), "content-disposition attachment header present");
+    const r2Key = headers.get("x-r2-key") || "";
+    assert(r2Key.startsWith("pdf/agreements/"), `unexpected R2 key ${r2Key}`);
+    assert(bytes.length > 500, `expected non-empty PDF, got ${bytes.length} bytes`);
+  });
+} else {
+  console.log("  - Skipping PDF endpoint test (set TEST_PDF_ENDPOINT=1 to enable)");
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 suite("Inventory");
