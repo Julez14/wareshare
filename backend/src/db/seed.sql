@@ -2,35 +2,35 @@
 -- Run with: wrangler d1 execute wareshare-db --local --file=./src/db/seed.sql
 
 -- Admin user (clerk_id: admin_test)
-INSERT INTO users (id, clerk_id, email, full_name, role, approval_status, created_at, updated_at)
+INSERT OR REPLACE INTO users (id, clerk_id, email, full_name, role, approval_status, created_at, updated_at)
 VALUES ('ADMIN001', 'admin_test', 'admin@wareshare.com', 'Admin User', 'admin', 'approved', datetime('now'), datetime('now'));
 
 -- Host user (clerk_id: host_test)
-INSERT INTO users (id, clerk_id, email, full_name, role, approval_status, business_reg_number, website, address, city, province, postal_code, phone, created_at, updated_at)
+INSERT OR REPLACE INTO users (id, clerk_id, email, full_name, role, approval_status, business_reg_number, website, address, city, province, postal_code, phone, created_at, updated_at)
 VALUES ('HOST001', 'host_test', 'host@example.com', 'Jane Warehouse', 'host', 'approved', '123456789', 'https://warehouse.example.com', '100 Industrial Ave', 'Toronto', 'ON', 'M5V 1A1', '+1-555-123-4567', datetime('now'), datetime('now'));
 
 -- Renter user (clerk_id: renter_test)
-INSERT INTO users (id, clerk_id, email, full_name, role, approval_status, business_reg_number, address, city, province, postal_code, created_at, updated_at)
+INSERT OR REPLACE INTO users (id, clerk_id, email, full_name, role, approval_status, business_reg_number, address, city, province, postal_code, created_at, updated_at)
 VALUES ('RENTER001', 'renter_test', 'renter@example.com', 'John Storage', 'renter', 'approved', '987654321', '200 Business St', 'Toronto', 'ON', 'M5V 2B2', datetime('now'), datetime('now'));
 
 -- Pending host (clerk_id: pending_host_test)
-INSERT INTO users (id, clerk_id, email, full_name, role, approval_status, created_at, updated_at)
+INSERT OR REPLACE INTO users (id, clerk_id, email, full_name, role, approval_status, created_at, updated_at)
 VALUES ('HOST002', 'pending_host_test', 'pending_host@example.com', 'Pending Host', 'host', 'pending', datetime('now'), datetime('now'));
 
 -- Pending renter (clerk_id: pending_renter_test)
-INSERT INTO users (id, clerk_id, email, full_name, role, approval_status, created_at, updated_at)
+INSERT OR REPLACE INTO users (id, clerk_id, email, full_name, role, approval_status, created_at, updated_at)
 VALUES ('RENTER002', 'pending_renter_test', 'pending_renter@example.com', 'Pending Renter', 'renter', 'pending', datetime('now'), datetime('now'));
 
 -- Second approved renter (clerk_id: renter2_test) — used for cross-renter isolation tests
-INSERT INTO users (id, clerk_id, email, full_name, role, approval_status, business_reg_number, address, city, province, postal_code, created_at, updated_at)
+INSERT OR REPLACE INTO users (id, clerk_id, email, full_name, role, approval_status, business_reg_number, address, city, province, postal_code, created_at, updated_at)
 VALUES ('RENTER003', 'renter2_test', 'renter2@example.com', 'Sara Boxes', 'renter', 'approved', '555000111', '300 Commerce Blvd', 'Vancouver', 'BC', 'V6B 1A1', datetime('now'), datetime('now'));
 
 -- Second approved host (clerk_id: host2_test) — used for cross-host isolation tests
-INSERT INTO users (id, clerk_id, email, full_name, role, approval_status, business_reg_number, address, city, province, postal_code, phone, created_at, updated_at)
+INSERT OR REPLACE INTO users (id, clerk_id, email, full_name, role, approval_status, business_reg_number, address, city, province, postal_code, phone, created_at, updated_at)
 VALUES ('HOST003', 'host2_test', 'host2@example.com', 'Mark Storage', 'host', 'approved', '222333444', '400 Warehouse Row', 'Calgary', 'AB', 'T2P 0B8', '+1-555-999-8888', datetime('now'), datetime('now'));
 
 -- Sample listing
-INSERT INTO listings (id, host_id, title, description, address, city, province, postal_code, country, lat, lng, size_sqft, price_per_month, currency, features, availability_status, fulfillment_available, fulfillment_description, min_rental_months, created_at, updated_at)
+INSERT OR REPLACE INTO listings (id, host_id, title, description, address, city, province, postal_code, country, lat, lng, size_sqft, price_per_month, currency, features, availability_status, fulfillment_available, fulfillment_description, min_rental_months, created_at, updated_at)
 VALUES (
   'LISTING001',
   'HOST001',
@@ -56,7 +56,7 @@ VALUES (
 );
 
 -- Another listing
-INSERT INTO listings (id, host_id, title, description, address, city, province, postal_code, country, size_sqft, price_per_month, currency, features, availability_status, fulfillment_available, min_rental_months, created_at, updated_at)
+INSERT OR REPLACE INTO listings (id, host_id, title, description, address, city, province, postal_code, country, size_sqft, price_per_month, currency, features, availability_status, fulfillment_available, min_rental_months, created_at, updated_at)
 VALUES (
   'LISTING002',
   'HOST001',
@@ -79,5 +79,5 @@ VALUES (
 );
 
 -- Sample listing photo
-INSERT INTO listing_photos (id, listing_id, r2_key, sort_order, created_at)
+INSERT OR REPLACE INTO listing_photos (id, listing_id, r2_key, sort_order, created_at)
 VALUES ('PHOTO001', 'LISTING001', 'listing-photo/HOST001/sample-warehouse.jpg', 0, datetime('now'));
