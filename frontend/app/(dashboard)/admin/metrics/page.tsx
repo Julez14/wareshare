@@ -86,10 +86,10 @@ export default function MetricsDashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787/api";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
       // TODO: replace with real Clerk token once auth is wired up
       const token = process.env.NEXT_PUBLIC_DEV_TOKEN ?? "";
-      const res = await fetch(`${apiUrl}/admin/metrics`, {
+      const res = await fetch(`${apiUrl}/api/admin/metrics`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         cache: "no-store",
       });
