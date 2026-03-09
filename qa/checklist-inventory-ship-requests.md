@@ -24,6 +24,7 @@
 | 4 | 2026-02-25 | `test-edge-cases.ts` (local, +RENTER003) | 42/42 ✓ cross-renter isolation confirmed |
 | 5 | 2026-02-26 | `test-edge-cases.ts` (local, +HOST003) | **58/58 ✓** role filter, idempotency, host isolation confirmed |
 | 6 | 2026-02-26 | `test-edge-cases.ts` (local, full) | **72/72 ✓** inventory defaults, ship request edge cases, admin reversed transitions |
+| 7 | 2026-03-09 | `test-edge-cases.ts` (live, post-Julian deploy + seed) | **72/72 ✓** all live API failures resolved |
 
 ---
 
